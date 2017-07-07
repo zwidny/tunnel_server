@@ -2,46 +2,29 @@
 import socket
 import sys
 import logging
+import socketserver
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 logging.basicConfig(level=logging.INFO)
 
-HOST = ''  # Symbolic name meaning all available interfaces
-PORT = 8888  # Arbitrary non-privileged port
-
-
-def client(host, port, content):
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.connect((host, port))
-        s.sendall(content)
-        data = s.recv(65537)
-        while data:
-            print('client data', data)
-            yield data
-            data = s.recv(65537)
-
-
-def server(host, port):
-    logging.debug('server start...')
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind((host, port))
-        s.listen(2)
-        conn, addr = s.accept()
-        with conn:
-            print('Connected by', addr)
-            # content = b''
-            while True:
-                data = conn.recv(65537)
-                if not data:
-                    break
-                print('data', data)
-                for content in client('166.111.65.135', 8000, data):
-                    print('content', content)
-                    conn.sendall(content)
-
 
 class TunnelHTTPRequestHandler(BaseHTTPRequestHandler):
+    def handle_client_request(self):
+        """处理来自client的请求
+
+        :return:
+        """
+        pass
+
+    def handle(self):
+        """Handle multiple requests if necessary."""
+        self.close_connection = True
+
+        self.handle_one_request()
+        while not self.close_connection:
+            self.handle_one_request()
+
     def handle_one_request(self):
         """Handle a single HTTP request.
 
@@ -102,6 +85,12 @@ def test(HandlerClass=BaseHTTPRequestHandler,
         sys.exit(0)
 
 
-if __name__ == '__main__':
-    test(TunnelHTTPRequestHandler)
+class TunnelBaseRequestHandler(socketserver.BaseRequestHandler):
+    def handle(self):
+        logging.info('handle')
 
+if __name__ == '__main__':
+    HOST = 'localhost'
+    PORT = 8000
+    server = socketserver.TCPServer((HOST, PORT), TunnelBaseRequestHandler)
+    server.serve_forever()
